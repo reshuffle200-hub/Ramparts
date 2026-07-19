@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Rampart">
+<meta name="theme-color" content="#161022">
+<title>Rampart — Bubble Castle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --sky:    #161022;
+    --stone:  #2A2438;
+    --stone2: #372F4A;
+    --mortar: #100B1A;
+    --ink:    #ECE6F5;
+    --dim:    #8B82A3;
+    --gold:   #E8B24C;
+    --red:    #E8556B;
+    --blue:   #4CA9E8;
+    --green:  #52D18A;
+    --edge:   #463D5E;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; margin: 0; }
+  html, body { height: 100%; overflow: hidden; }
+  body {
+    background: var(--sky);
+    color: var(--ink);
+    font-family: "Space Grotesk", system-ui, sans-serif;
+    touch-action: none;
+    -webkit-user-select: none; user-select: none;
+    display: flex; flex-direction: column;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  canvas { display: block; touch-action: none; }
+
+  /* ---------- top HUD ---------- */
+  #hud {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 3;
+    display: flex; align-items: center; gap: 10px;
+    padding: calc(env(safe-area-inset-top) + 8px) 12px 8px;
+    background: linear-gradient(var(--mortar), transparent);
+    font-family: "JetBrains Mono", "Space Grotesk", monospace;
+    pointer-events: none;
+  }
+  .stat { display: flex; flex-direction: column; line-height: 1.1; }
+  .stat .k {
+    font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim);
+  }
+  .stat .v { font-size: 16px; font-weight: 700; }
+  .v.coins { color: var(--gold); }
+  .v.wave  { color: var(--ink); }
+  #castleBar {
+    flex: 1; height: 9px; border-radius: 5px;
+    background: var(--mortar); border: 1px solid var(--edge);
+    overflow: hidden; margin-top: 9px;
+  }
+  #castleFill {
+    height: 100%; width: 100%;
+    background: linear-gradient(90deg, var(--red), var(--gold));
+    transition: width 0.25s;
+  }
+
+  /* ---------- shop drawer ---------- */
+  #shop {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 6;
+    background: rgba(22,16,34,0.98);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 2px solid var(--edge);
+    border-radius: 16px 16px 0 0;
+    padding: 14px 16px calc(16px + env(safe-area-inset-bottom));
+    transform: translateY(100%);
+    transition: transform 0.3s cubic-bezier(0.3,0.9,0.3,1);
+    max-height: 82vh; overflow-y: auto;
+  }
+  #shop.open { transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce){ #shop { transition: none; } }
+  .shop-head { display: flex; align-items: baseline; margin-bottom: 4px; }
+  .shop-head h2 { font-family: "Cinzel", serif; font-size: 17px; font-weight: 700; letter-spacing: 0.02em; }
+  .shop-head .close {
+    margin-left: auto; pointer-events: auto;
+    background: none; border: 1px solid var(--edge); border-radius: 8px;
+    color: var(--ink); font-family: "JetBrains Mono", monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 7px 12px;
+  }
+  .shop-sub { color: var(--dim); font-size: 11px; margin-bottom: 2px; }
+  .shop-sub b { color: var(--gold); }
+  .shop-ctx { color: var(--dim); font-size: 11px; margin-bottom: 14px; }
+  .shop-ctx b { color: var(--ink); }
+  .group-lbl {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim);
+    margin: 6px 0 8px;
+  }
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; }
+  .card {
+    background: var(--stone); border: 1px solid var(--edge); border-radius: 10px;
+    padding: 9px 8px; text-align: center;
+  }
+  .card .swatch {
+    width: 34px; height: 34px; border-radius: 50%; margin: 0 auto 7px;
+    border: 2px solid rgba(255,255,255,0.25);
+  }
+  .card .nm { font-size: 11px; font-weight: 700; }
+  .card .ds { font-size: 9px; color: var(--dim); line-height: 1.35; margin: 3px 0 8px; min-height: 24px; }
+  .card .buy {
+    width: 100%; border: 0; border-radius: 7px;
+    background: var(--gold); color: #2A1E05;
+    font-family: "JetBrains Mono", monospace; font-weight: 700;
+    font-size: 11px; padding: 7px 4px;
+  }
+  .card .buy:disabled { background: var(--stone2); color: var(--dim); }
+
+  /* ---------- generic buttons ---------- */
+  .btn {
+    pointer-events: auto;
+    background: rgba(42,36,56,0.85); border: 1px solid var(--edge); border-radius: 9px;
+    color: var(--ink); font-family: "JetBrains Mono", monospace;
+    font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 8px 12px;
+  }
+  #shopBtn {
+    position: fixed; z-index: 4; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px);
+    background: var(--gold); color: #2A1E05; font-weight: 700; border: 0;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+  }
+
+  /* ---------- overlays ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    background: rgba(16,11,26,0.92);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: none; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 32px;
+  }
+  .overlay.show { display: flex; }
+  .overlay h1 {
+    font-family: "Cinzel", serif; font-size: 34px; font-weight: 700;
+    letter-spacing: 0.02em; margin-bottom: 6px;
+  }
+  .overlay .title {
+    background: linear-gradient(180deg, #F4D98A, #E8B24C);
+    -webkit-background-clip: text; background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .crest {
+    font-size: 54px; margin-bottom: 4px;
+    filter: drop-shadow(0 3px 10px rgba(232,178,76,0.4));
+  }
+  .levelGrid {
+    display: flex; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 300px; margin: 20px 0 6px;
+  }
+  .levelCard {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--stone); border: 1px solid var(--edge); border-radius: 12px;
+    padding: 14px 16px; text-align: left; color: var(--ink);
+    font-family: "Space Grotesk", sans-serif;
+  }
+  .levelCard.locked { opacity: 0.45; }
+  .levelCard .num {
+    font-family: "Cinzel", serif; font-weight: 700; font-size: 22px;
+    color: var(--gold); width: 30px; text-align: center;
+  }
+  .levelCard .meta { flex: 1; }
+  .levelCard .meta .nm { font-weight: 700; font-size: 15px; }
+  .levelCard .meta .st { font-size: 11px; color: var(--dim); margin-top: 2px; }
+  .levelCard .go2 {
+    border: 0; border-radius: 8px; background: var(--gold); color: #2A1E05;
+    font-family: "JetBrains Mono", monospace; font-weight: 700; font-size: 12px;
+    padding: 8px 14px;
+  }
+  .levelCard.locked .go2 { background: var(--stone2); color: var(--dim); }
+  .overlay .tag { color: var(--dim); font-size: 13px; margin-bottom: 4px; }
+  .overlay .big { font-size: 15px; margin: 18px 0; }
+  .overlay .big b { color: var(--gold); }
+  .stars { font-size: 40px; letter-spacing: 6px; margin: 10px 0 4px; }
+  .overlay .go {
+    margin-top: 22px; border: 0; border-radius: 11px;
+    background: var(--gold); color: #2A1E05;
+    font-family: "Cinzel", serif; font-weight: 700; font-size: 16px;
+    padding: 13px 34px; letter-spacing: 0.04em;
+  }
+  .overlay .ghost {
+    margin-top: 12px; background: none; border: 1px solid var(--edge);
+    color: var(--dim); border-radius: 9px;
+    font-family: "JetBrains Mono", monospace; font-size: 10px;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 9px 18px;
+  }
+  .hintline {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom) + 66px); z-index: 4;
+    font-family: "JetBrains Mono", monospace; font-size: 10px; color: var(--dim);
+    letter-spacing: 0.08em; text-align: center; pointer-events: none;
+    transition: opacity 0.6s; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<div id="hud">
+  <div class="stat"><span class="k">Score</span><span class="v" id="hScore">0</span></div>
+  <div class="stat"><span class="k">Coins</span><span class="v coins" id="hCoins">0</span></div>
+  <div id="castleBar"><div id="castleFill"></div></div>
+  <div class="stat" style="text-align:right"><span class="k">Wave</span><span class="v wave" id="hWave">0/0</span></div>
+</div>
+
+<canvas id="game"></canvas>
+
+<div class="hintline" id="hint">tap a cannon to aim it · tap again to release · Build to buy & upgrade</div>
+<button class="btn" id="shopBtn">Build ⚒</button>
+
+<div id="shop">
+  <div class="shop-head">
+    <h2>Armory</h2>
+    <button class="close" id="shopClose">Close</button>
+  </div>
+  <p class="shop-sub">Coins: <b id="shopCoins">0</b></p>
+  <p class="shop-ctx" id="shopCtx">Tap an empty slot on the wall, then buy a turret for it.</p>
+  <div id="shopBody"></div>
+</div>
+
+<!-- main menu -->
+<div class="overlay show" id="menuOverlay">
+  <div class="crest">🛡</div>
+  <h1 class="title">RAMPART</h1>
+  <p class="tag">Hold the gate against the falling siege.</p>
+  <button class="go" id="playBtn">Play</button>
+</div>
+
+<!-- level select -->
+<div class="overlay" id="levelOverlay">
+  <div class="tag">Choose a siege</div>
+  <h1 class="title" style="font-size:26px">Campaign</h1>
+  <div class="levelGrid" id="levelGrid"></div>
+  <button class="ghost" id="levelBack">Back</button>
+</div>
+
+<!-- level intro -->
+<div class="overlay" id="startOverlay">
+  <div class="tag" id="introTag">Level 1</div>
+  <h1 id="introTitle">The First Siege</h1>
+  <p class="big">Bubbles fall from the night. Only a cannon of the <em>same colour</em> can pop them.<br>Don't let them reach the gate.</p>
+  <button class="go" id="startBtn">Begin</button>
+  <button class="ghost" id="introBack">Back</button>
+</div>
+
+<!-- results -->
+<div class="overlay" id="endOverlay">
+  <div class="tag" id="endTag">Level 1</div>
+  <h1 id="endTitle">Held.</h1>
+  <div class="stars" id="endStars">★★★</div>
+  <p class="big">Score <b id="endScore">0</b> · earned <b id="endCoins">0</b> coins</p>
+  <button class="go" id="endNext">Continue</button>
+  <button class="ghost" id="endRetry">Replay level</button>
+</div>
+
+<script>
+/* ============================================================
+   RAMPART — a castle-defense bubble game. Level 1.
+   Color is a hard gate: a turret only pops bubbles of its own
+   colour (multicolour turrets pop anything). Turrets auto-fire
+   at the nearest valid bubble on their side; tap a bubble to
+   force nearby turrets to focus it.
+   ============================================================ */
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+/* ---- palette (matches CSS) ---- */
+const COLORS = {
+  red:   "#E8556B",
+  blue:  "#4CA9E8",
+  green: "#52D18A",
+};
+const COLOR_KEYS = ["red", "blue", "green"];
+
+/* ---- turret catalogue ---- */
+const TURRETS = {
+  red:   { label: "Ember",  color: "red",   cost: 30, desc: "Pops red bubbles." },
+  blue:  { label: "Frost",  color: "blue",  cost: 30, desc: "Pops blue bubbles." },
+  green: { label: "Moss",   color: "green", cost: 30, desc: "Pops green bubbles." },
+  multi: { label: "Prism",  color: "multi", cost: 75, desc: "Pops ANY colour." },
+};
+
+/* ---- upgrade paths (chosen once per turret) ---- */
+const PATHS = {
+  sniper: { label: "Sniper", cost: 40, desc: "+Range, +damage, slow." },
+  multi:  { label: "Volley", cost: 40, desc: "Fires 3 bolts at once." },
+  rapid:  { label: "Rapid",  cost: 40, desc: "Much faster fire." },
+};
+
+/* ---- level 1 definition ---- */
+const LEVEL = {
+  id: 1,
+  castleHP: 100,
+  slotsPerSide: 6,
+  startCoins: 90,
+  colors: ["red", "blue", "green"],
+  /* each wave: count, interval(s), speed(px/s), then a gap before next */
+  waves: [
+    { n: 10, gap: 1.10, speed: 30, after: 3.0 },
+    { n: 16, gap: 0.85, speed: 36, after: 3.0 },
+    { n: 22, gap: 0.62, speed: 42, after: 3.5 },
+    { n: 56, gap: 0.22, speed: 58, after: 0, boss: true },   // the surge
+  ],
+  starCuts: [1800, 2300, 2700],   // score thresholds for 1/2/3 stars
+};
+
+/* ============================================================
+   STATE
+   ============================================================ */
+let W = 0, H = 0, DPR = 1;
+let wall = { top: 0, bottom: 0, left: 0, right: 0, colW: 0 };   // playfield metrics
+let slots = [];       // {side, x, y, turret|null}
+let bubbles = [];
+let bolts = [];
+let pops = [];        // particle bursts
+let coinsFx = [];
+
+const G = {
+  running: false,
+  over: false,
+  score: 0,
+  coins: LEVEL.startCoins,
+  castleHP: LEVEL.castleHP,
+  waveIdx: -1,
+  selectedSlot: null,
+  spawnQueue: [],     // scheduled bubble spawns for current wave
+  waveActive: false,
+  betweenTimer: 0,
+  lastT: 0,
+};
+
+/* ============================================================
+   LAYOUT
+   ============================================================ */
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth;
+  H = window.innerHeight;
+  canvas.width = W * DPR;
+  canvas.height = H * DPR;
+  canvas.style.width = W + "px";
+  canvas.style.height = H + "px";
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+  const colW = Math.max(46, Math.min(64, W * 0.15));
+  const hud = document.getElementById("hud");
+  const hudH = hud ? hud.offsetHeight : 90;
+  wall = {
+    top: hudH + 24,               // leave room for battlements below the HUD
+    bottom: H - 96,
+    left: colW,
+    right: W - colW,
+    colW,
+  };
+  layoutSlots();
+  grassTufts = null;   // reseed for the new channel size
+}
+
+function layoutSlots() {
+  const prev = slots;
+  slots = [];
+  const n = LEVEL.slotsPerSide;
+  const pad = wall.colW * 0.5;          // clearance for the corner towers
+  const top = wall.top + pad, bottom = wall.bottom - pad;
+  const span = bottom - top;
+  const step = span / n;
+  for (let side = 0; side < 2; side++) {
+    const cx = side === 0 ? wall.colW / 2 : W - wall.colW / 2;
+    for (let i = 0; i < n; i++) {
+      const cy = top + step * (i + 0.5);
+      const old = prev.find(s => s.side === side && s.i === i);
+      slots.push({ side, i, x: cx, y: cy, turret: old ? old.turret : null });
+    }
+  }
+}
+
+/* ============================================================
+   TURRET / BUBBLE MODELS
+   ============================================================ */
+function makeTurret(kind) {
+  const t = TURRETS[kind];
+  return {
+    kind, color: t.color, label: t.label,
+    path: null,
+    level: 1,
+    cooldown: 0,
+    baseRate: 0.9,     // seconds between shots
+    range: 1600,       // effectively the whole map
+    damage: 1,
+    focus: null,       // a bubble to prioritise
+    manualAim: null,   // locked heading (radians) when the player aims it
+    flash: 0,
+    aim: null,         // current barrel angle (radians); null = rest pose
+  };
+}
+
+function turretStats(t) {
+  let rate = t.baseRate, range = t.range, shots = 1, dmg = t.damage;
+  if (t.path === "sniper") { range *= 1.9; dmg += 1; rate *= 1.5; }
+  if (t.path === "rapid")  { rate *= 0.38; }
+  if (t.path === "multi")  { shots = 3; rate *= 1.15; }
+  // per-level scaling
+  rate *= Math.pow(0.9, t.level - 1);
+  range *= 1 + 0.08 * (t.level - 1);
+  return { rate, range, shots, dmg };
+}
+
+/* where to aim so a bolt meets a moving bubble: solve for the lead point by
+   estimating flight time and projecting the bubble forward a couple times.
+   Bolts travel at BOLT_SPEED; bubbles drift mostly downward. */
+const BOLT_SPEED = 520;
+function leadPoint(s, b) {
+  let tx = b.x, ty = b.y;
+  for (let i = 0; i < 3; i++) {
+    const flight = Math.hypot(tx - s.x, ty - s.y) / BOLT_SPEED;
+    tx = b.x + (b.vx || 0) * flight;
+    ty = b.y + b.vy * flight;
+  }
+  return { x: tx, y: ty };
+}
+
+/* which bubble is this turret currently interested in? shared by the barrel
+   tracking (every frame) and the firing code (on cooldown) so the barrel
+   always points where the next bolt will go. Cannons can reach the whole map.
+   When the player has locked a manual heading, only bubbles within a cone of
+   that heading are considered. */
+function acquireTarget(s, t) {
+  const st = turretStats(t);
+  const hasAim = t.manualAim != null;
+
+  if (t.focus && bubbles.includes(t.focus) &&
+      (t.color === "multi" || t.focus.color === t.color)) {
+    const d = Math.hypot(t.focus.x - s.x, t.focus.y - s.y);
+    if (d <= st.range) return t.focus;
+    t.focus = null;
+  }
+  let best = st.range, target = null;
+  for (const b of bubbles) {
+    if (t.color !== "multi" && b.color !== t.color) continue;
+    const dx = b.x - s.x, dy = b.y - s.y;
+    const d = Math.hypot(dx, dy);
+    if (d > st.range) continue;
+    if (hasAim) {
+      let da = Math.atan2(dy, dx) - t.manualAim;
+      while (da > Math.PI) da -= 2 * Math.PI;
+      while (da < -Math.PI) da += 2 * Math.PI;
+      if (Math.abs(da) > 0.6) continue;   // outside the ~34° aim cone
+    }
+    if (d < best) { best = d; target = b; }
+  }
+  return target;
+}
+
+function spawnBubble(color, speed) {
+  const r = 17;
+  const x = wall.left + r + Math.random() * (wall.right - wall.left - 2 * r);
+  bubbles.push({
+    x, y: wall.top - 4, r, color,
+    vy: speed * (0.85 + Math.random() * 0.3),
+    vx: (Math.random() - 0.5) * 8,
+    hp: 1, wobble: Math.random() * 6.28,
+  });
+}
+
+/* ============================================================
+   WAVES
+   ============================================================ */
+function startWave(idx) {
+  const w = LEVEL.waves[idx];
+  if (!w) return;
+  G.waveIdx = idx;
+  G.waveActive = true;
+  G.spawnQueue = [];
+  let t = 0;
+  for (let k = 0; k < w.n; k++) {
+    const color = LEVEL.colors[(Math.random() * LEVEL.colors.length) | 0];
+    G.spawnQueue.push({ at: t, color, speed: w.speed });
+    t += w.gap;
+  }
+  updateHUD();
+}
+
+function wavesRemainingText() {
+  return `${Math.max(G.waveIdx + 1, 1)}/${LEVEL.waves.length}`;
+}
+
+/* ============================================================
+   INPUT
+   ============================================================ */
+function canvasPoint(e) {
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX, y: t.clientY };
+}
+
+function onTap(e) {
+  if (!G.running) return;
+  const p = canvasPoint(e);
+
+  // find a tapped slot and a tapped bubble
+  let hitS = null, hsD = 26;
+  for (const s of slots) {
+    const d = Math.hypot(s.x - p.x, s.y - p.y);
+    if (d < hsD) { hsD = d; hitS = s; }
+  }
+  let hitB = null, hbD = 26;
+  for (const b of bubbles) {
+    const d = Math.hypot(b.x - p.x, b.y - p.y);
+    if (d < b.r + 14 && d < hbD) { hbD = d; hitB = b; }
+  }
+
+  // 1) tapped a slot
+  if (hitS) {
+    if (!hitS.turret) {
+      // empty: select and open the armory to build here
+      G.selectedSlot = hitS;
+      openShop();
+    } else if (G.selectedSlot === hitS) {
+      // tapping the selected cannon again releases it back to auto
+      hitS.turret.manualAim = null;
+      hitS.turret.focus = null;
+      G.selectedSlot = null;
+    } else {
+      // select this cannon for aiming
+      G.selectedSlot = hitS;
+    }
+    return;
+  }
+
+  // 2) a cannon is selected -> tapping the field aims it there (and locks on a
+  //    bubble if you tapped one)
+  if (G.selectedSlot && G.selectedSlot.turret) {
+    const t = G.selectedSlot.turret, s = G.selectedSlot;
+    if (hitB && (t.color === "multi" || hitB.color === t.color)) {
+      t.manualAim = Math.atan2(hitB.y - s.y, hitB.x - s.x);
+      t.focus = hitB;
+    } else {
+      t.manualAim = Math.atan2(p.y - s.y, p.x - s.x);
+      t.focus = null;
+    }
+    return;
+  }
+
+  // 3) no selection: tapping a bubble redirects ALL matching cannons at it
+  if (hitB) focusTurretsOn(hitB);
+}
+
+function focusTurretsOn(b) {
+  for (const s of slots) {
+    if (!s.turret) continue;
+    const t = s.turret;
+    if (t.color === "multi" || t.color === b.color) {
+      t.focus = b;
+      t.flash = 0.3;
+    }
+  }
+}
+
+canvas.addEventListener("pointerdown", onTap);
+
+/* ============================================================
+   SHOP
+   ============================================================ */
+const shop = document.getElementById("shop");
+const shopBody = document.getElementById("shopBody");
+
+function openShop() {
+  buildShop();
+  shop.classList.add("open");
+}
+function openShopForTurret(slot) {
+  buildShop(slot);
+  shop.classList.add("open");
+}
+function closeShop() { shop.classList.remove("open"); }
+
+document.getElementById("shopBtn").onclick = () => {
+  // if a built cannon is selected, open its upgrade menu; otherwise the armory
+  if (G.selectedSlot && G.selectedSlot.turret) openShopForTurret(G.selectedSlot);
+  else openShop();
+};
+document.getElementById("shopClose").onclick = closeShop;
+
+function card(swatch, name, desc, costLabel, disabled, onBuy, id) {
+  const el = document.createElement("div");
+  el.className = "card";
+  el.innerHTML = `
+    <div class="swatch" style="background:${swatch}"></div>
+    <div class="nm">${name}</div>
+    <div class="ds">${desc}</div>
+    <button class="buy" ${disabled ? "disabled" : ""}>${costLabel}</button>`;
+  el.querySelector(".buy").onclick = onBuy;
+  return el;
+}
+
+function prismSwatch() {
+  return "conic-gradient(" + COLORS.red + "," + COLORS.blue + "," + COLORS.green + "," + COLORS.red + ")";
+}
+
+function buildShop(slot) {
+  slot = slot || G.selectedSlot;
+  shopBody.innerHTML = "";
+  const coinEl = document.getElementById("shopCoins");
+  const ctx2 = document.getElementById("shopCtx");
+  if (coinEl) coinEl.textContent = G.coins;
+
+  if (!slot) {
+    ctx2.innerHTML = "Tap an empty slot on the wall, then buy a turret for it.";
+    return;
+  }
+
+  if (!slot.turret) {
+    ctx2.innerHTML = `Building on the <b>${slot.side===0?"left":"right"} wall, slot ${slot.i+1}</b>`;
+    const lbl = document.createElement("div");
+    lbl.className = "group-lbl"; lbl.textContent = "Turrets";
+    const grid = document.createElement("div"); grid.className = "cards";
+    for (const key of ["red","blue","green","multi"]) {
+      const t = TURRETS[key];
+      const sw = key === "multi" ? prismSwatch() : COLORS[t.color];
+      grid.appendChild(card(sw, t.label, t.desc, `${t.cost} ⛃`, G.coins < t.cost,
+        () => { buyTurret(slot, key); }));
+    }
+    shopBody.append(lbl, grid);
+  } else {
+    const t = slot.turret;
+    ctx2.innerHTML = `<b>${t.label}</b> · level ${t.level}${t.path ? " · " + PATHS[t.path].label : ""}`;
+
+    if (!t.path) {
+      const lbl = document.createElement("div");
+      lbl.className = "group-lbl"; lbl.textContent = "Choose a path (permanent)";
+      const grid = document.createElement("div"); grid.className = "cards";
+      for (const key of ["sniper","multi","rapid"]) {
+        const p = PATHS[key];
+        grid.appendChild(card(COLORS[t.color] || prismSwatch(), p.label, p.desc,
+          `${p.cost} ⛃`, G.coins < p.cost, () => { buyPath(slot, key); }));
+      }
+      shopBody.append(lbl, grid);
+    } else {
+      const lbl = document.createElement("div");
+      lbl.className = "group-lbl"; lbl.textContent = "Upgrade";
+      const grid = document.createElement("div"); grid.className = "cards";
+      const upCost = 30 + t.level * 20;
+      grid.appendChild(card(COLORS[t.color] || prismSwatch(), `${PATHS[t.path].label} ${t.level+1}`,
+        "Sharper, faster, longer reach.", `${upCost} ⛃`, G.coins < upCost,
+        () => { buyLevel(slot, upCost); }));
+      shopBody.append(lbl, grid);
+    }
+  }
+}
+
+function buyTurret(slot, kind) {
+  const t = TURRETS[kind];
+  if (G.coins < t.cost || slot.turret) return;
+  G.coins -= t.cost;
+  slot.turret = makeTurret(kind);
+  updateHUD();
+  buildShop(slot);
+}
+function buyPath(slot, key) {
+  const p = PATHS[key];
+  if (!slot.turret || slot.turret.path || G.coins < p.cost) return;
+  G.coins -= p.cost;
+  slot.turret.path = key;
+  updateHUD();
+  buildShop(slot);
+}
+function buyLevel(slot, cost) {
+  if (!slot.turret || G.coins < cost) return;
+  G.coins -= cost;
+  slot.turret.level++;
+  updateHUD();
+  buildShop(slot);
+}
+
+/* ============================================================
+   COMBAT
+   ============================================================ */
+function fireTurret(s, t) {
+  const st = turretStats(t);
+  const target = acquireTarget(s, t);
+  if (!target) return false;
+
+  const lead = leadPoint(s, target);          // aim ahead of the moving bubble
+  const baseAng = Math.atan2(lead.y - s.y, lead.x - s.x);
+  const n = st.shots;
+  for (let k = 0; k < n; k++) {
+    const spread = (k - (n - 1) / 2) * 0.14;
+    const ang = baseAng + spread;
+    bolts.push({
+      x: s.x, y: s.y,
+      vx: Math.cos(ang) * BOLT_SPEED, vy: Math.sin(ang) * BOLT_SPEED,
+      color: t.color === "multi" ? target.color : t.color,
+      matchAny: t.color === "multi",
+      dmg: st.dmg, life: 1.2,
+    });
+  }
+  t.flash = 0.12;
+  return true;
+}
+
+function popBubble(b, byColor) {
+  const idx = bubbles.indexOf(b);
+  if (idx === -1) return;
+  bubbles.splice(idx, 1);
+  // higher pops score more — rewards reacting fast instead of last-second
+  const height = 1 - (b.y - wall.top) / (wall.bottom - wall.top);
+  G.score += 10 + Math.round(Math.max(0, height) * 15);
+  // coins occasionally drop
+  if (Math.random() < 0.5) {
+    const amt = 1 + (Math.random() < 0.2 ? 1 : 0);
+    G.coins += amt;
+    coinsFx.push({ x: b.x, y: b.y, vy: -40, life: 0.9, amt });
+  }
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * 6.28, sp = 40 + Math.random() * 90;
+    pops.push({ x: b.x, y: b.y, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life: 0.4 + Math.random()*0.2, color: COLORS[b.color] });
+  }
+  updateHUD();
+}
+
+/* ============================================================
+   UPDATE
+   ============================================================ */
+function update(dt) {
+  // spawn from queue
+  if (G.waveActive) {
+    const w = LEVEL.waves[G.waveIdx];
+    for (let i = G.spawnQueue.length - 1; i >= 0; i--) {
+      G.spawnQueue[i].at -= dt;
+      if (G.spawnQueue[i].at <= 0) {
+        spawnBubble(G.spawnQueue[i].color, G.spawnQueue[i].speed);
+        G.spawnQueue.splice(i, 1);
+      }
+    }
+    if (G.spawnQueue.length === 0 && bubbles.length === 0) {
+      // wave cleared
+      G.waveActive = false;
+      if (G.waveIdx + 1 >= LEVEL.waves.length) { endLevel(true); return; }
+      G.betweenTimer = LEVEL.waves[G.waveIdx].after;
+    }
+  } else if (!G.over) {
+    G.betweenTimer -= dt;
+    if (G.betweenTimer <= 0 && G.waveIdx + 1 < LEVEL.waves.length) {
+      startWave(G.waveIdx + 1);
+    }
+  }
+
+  // turrets
+  for (const s of slots) {
+    const t = s.turret;
+    if (!t) continue;
+    t.cooldown -= dt;
+    if (t.flash > 0) t.flash -= dt;
+    const st = turretStats(t);
+
+    // barrel tracking: slew toward the target (or locked heading) at a fixed
+    // angular rate — smoother and slower than snapping. Straight up at rest.
+    const restAng = t.manualAim != null ? t.manualAim : -Math.PI / 2;
+    const tgt = acquireTarget(s, t);
+    let wantAng = restAng;
+    if (tgt) {
+      const lead = leadPoint(s, tgt);
+      wantAng = Math.atan2(lead.y - s.y, lead.x - s.x);
+    }
+    if (t.aim === null) t.aim = wantAng;
+    else {
+      let d = wantAng - t.aim;
+      while (d > Math.PI) d -= 2 * Math.PI;
+      while (d < -Math.PI) d += 2 * Math.PI;
+      const maxRate = t.path === "sniper" ? 1.4 : 2.2;   // rad/s; snipers heavier
+      const step = maxRate * dt;
+      t.aim += Math.abs(d) <= step ? d : Math.sign(d) * step;
+    }
+
+    if (t.cooldown <= 0) {
+      if (fireTurret(s, t)) t.cooldown = st.rate;
+      else t.cooldown = 0.1;
+    }
+  }
+
+  // bolts
+  for (let i = bolts.length - 1; i >= 0; i--) {
+    const bo = bolts[i];
+    bo.x += bo.vx * dt; bo.y += bo.vy * dt; bo.life -= dt;
+    if (bo.x < 0 || bo.x > W || bo.y < 0 || bo.y > H || bo.life <= 0) {
+      bolts.splice(i, 1); continue;
+    }
+    for (const b of bubbles) {
+      if (!bo.matchAny && b.color !== bo.color) continue;
+      if (Math.hypot(b.x - bo.x, b.y - bo.y) < b.r + 4) {
+        b.hp -= bo.dmg;
+        bolts.splice(i, 1);
+        if (b.hp <= 0) popBubble(b, bo.color);
+        break;
+      }
+    }
+  }
+
+  // bubbles fall
+  for (let i = bubbles.length - 1; i >= 0; i--) {
+    const b = bubbles[i];
+    b.wobble += dt * 4;
+    b.y += b.vy * dt;
+    b.x += b.vx * dt + Math.sin(b.wobble) * 6 * dt;
+    if (b.x < wall.left + b.r) { b.x = wall.left + b.r; b.vx = Math.abs(b.vx); }
+    if (b.x > wall.right - b.r) { b.x = wall.right - b.r; b.vx = -Math.abs(b.vx); }
+    if (b.y >= wall.bottom - b.r) {
+      bubbles.splice(i, 1);
+      G.castleHP -= 8;
+      G.score = Math.max(0, G.score - 8);
+      spawnHitFx(b.x);
+      updateHUD();
+      if (G.castleHP <= 0) { G.castleHP = 0; endLevel(false); return; }
+    }
+  }
+
+  // fx
+  for (let i = pops.length - 1; i >= 0; i--) {
+    const p = pops[i]; p.x += p.vx*dt; p.y += p.vy*dt; p.vy += 120*dt; p.life -= dt;
+    if (p.life <= 0) pops.splice(i, 1);
+  }
+  for (let i = coinsFx.length - 1; i >= 0; i--) {
+    const c = coinsFx[i]; c.y += c.vy*dt; c.vy += 30*dt; c.life -= dt;
+    if (c.life <= 0) coinsFx.splice(i, 1);
+  }
+}
+
+let shakeT = 0, shakeMag = 0;
+function spawnHitFx(x) {
+  shakeT = 0.25; shakeMag = 7;
+  for (let i = 0; i < 14; i++) {
+    const a = -Math.PI/2 + (Math.random()-0.5)*1.4, sp = 60 + Math.random()*120;
+    pops.push({ x, y: wall.bottom, vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life: 0.5, color: "#8B82A3" });
+  }
+}
+
+/* ============================================================
+   RENDER
+   ============================================================ */
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // solid backdrop first, so no transparent canvas ever shows as white
+  ctx.fillStyle = "#161022";
+  ctx.fillRect(0, 0, W, H);
+
+  // sky glow scales with threat on screen — a menacing bloom above the field
+  const threat = Math.min(bubbles.length / 22, 1);
+  const g = ctx.createRadialGradient(W/2, 0, 40, W/2, 0, H);
+  g.addColorStop(0, `rgba(90,50,110,${0.2 + threat*0.35})`);
+  g.addColorStop(1, "rgba(22,16,34,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  let ox = 0, oy = 0;
+  if (shakeT > 0) {
+    shakeT -= 1/60;
+    ox = (Math.random()-0.5) * shakeMag;
+    oy = (Math.random()-0.5) * shakeMag;
+  }
+  ctx.save();
+  ctx.translate(ox, oy);
+
+  drawField();
+  drawWalls();
+  drawSlots();
+
+  // aim line from a selected cannon
+  if (G.selectedSlot && G.selectedSlot.turret) {
+    const s = G.selectedSlot, t = s.turret;
+    const ang = t.aim != null ? t.aim : -Math.PI / 2;
+    const len = 90;
+    ctx.strokeStyle = "rgba(232,178,76,0.5)";
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y);
+    ctx.lineTo(s.x + Math.cos(ang) * len, s.y + Math.sin(ang) * len);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // bubbles
+  for (const b of bubbles) drawBubble(b);
+
+  // bolts
+  for (const bo of bolts) {
+    ctx.strokeStyle = COLORS[bo.color] || "#fff";
+    ctx.lineWidth = 3; ctx.lineCap = "round";
+    ctx.globalAlpha = 0.9;
+    ctx.beginPath();
+    ctx.moveTo(bo.x, bo.y);
+    ctx.lineTo(bo.x - bo.vx*0.012, bo.y - bo.vy*0.012);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // pops
+  for (const p of pops) {
+    ctx.globalAlpha = Math.max(p.life * 2, 0);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 6.28); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  // coin popups
+  for (const c of coinsFx) {
+    ctx.globalAlpha = Math.max(c.life, 0);
+    ctx.fillStyle = "#E8B24C";
+    ctx.font = "700 13px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("+" + c.amt + "⛃", c.x, c.y);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.restore();
+}
+
+/* the grassy path the bubbles descend — a lit strip between the ramparts,
+   seeded with static tufts so it doesn't shimmer frame to frame */
+let grassTufts = null;
+function seedGrass() {
+  grassTufts = [];
+  const n = 90;
+  for (let i = 0; i < n; i++) {
+    grassTufts.push({
+      fx: Math.random(),            // fractional position in the channel
+      fy: Math.random(),
+      h: 4 + Math.random() * 6,
+      lean: (Math.random() - 0.5) * 3,
+      shade: Math.random(),
+    });
+  }
+}
+function drawField() {
+  if (!grassTufts) seedGrass();
+  const x0 = wall.left, x1 = wall.right, w = x1 - x0;
+  const y0 = 0, y1 = wall.bottom;          // grass fills the whole channel, top to gate
+  const h = y1 - y0;
+
+  // grass base gradient — a touch brighter up top where bubbles emerge
+  const g = ctx.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, "#437439");
+  g.addColorStop(0.5, "#356032");
+  g.addColorStop(1, "#294B27");
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, y0, w, h);
+
+  // faint mown stripes down the path
+  ctx.globalAlpha = 0.08;
+  ctx.fillStyle = "#000";
+  for (let i = 0; i < 6; i++) {
+    if (i % 2) ctx.fillRect(x0 + w * i / 6, y0, w / 6, h);
+  }
+  ctx.globalAlpha = 1;
+
+  // scattered grass blades
+  for (const t of grassTufts) {
+    const gx = x0 + t.fx * w, gy = y0 + t.fy * h;
+    ctx.strokeStyle = t.shade > 0.5 ? "#4C7D42" : "#2F5A2C";
+    ctx.lineWidth = 1.4; ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.quadraticCurveTo(gx + t.lean, gy - t.h * 0.6, gx + t.lean * 1.6, gy - t.h);
+    ctx.stroke();
+  }
+
+  // soft edge shadow where grass meets the stone walls
+  const ls = ctx.createLinearGradient(x0, 0, x0 + 14, 0);
+  ls.addColorStop(0, "rgba(0,0,0,0.35)"); ls.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = ls; ctx.fillRect(x0, y0, 14, h);
+  const rs = ctx.createLinearGradient(x1, 0, x1 - 14, 0);
+  rs.addColorStop(0, "rgba(0,0,0,0.35)"); rs.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = rs; ctx.fillRect(x1 - 14, y0, 14, h);
+}
+
+function drawWalls() {
+  const cw = wall.colW;
+
+  for (const side of [0, 1]) {
+    const x0 = side === 0 ? 0 : W - cw;
+    const cx = x0 + cw / 2;
+
+    // full-width stone column, top of screen to bottom — no gaps to show through
+    const g = ctx.createLinearGradient(x0, 0, x0 + cw, 0);
+    if (side === 0) {
+      g.addColorStop(0, "#4A4162"); g.addColorStop(0.55, "#38304D"); g.addColorStop(1, "#241D33");
+    } else {
+      g.addColorStop(0, "#241D33"); g.addColorStop(0.45, "#38304D"); g.addColorStop(1, "#4A4162");
+    }
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, 0, cw, H);
+
+    // staggered stone blocks
+    ctx.strokeStyle = "rgba(16,11,26,0.6)"; ctx.lineWidth = 1;
+    const rh = 22, bw = cw / 2;
+    for (let ry = wall.top - 20, row = 0; ry < H; ry += rh, row++) {
+      ctx.beginPath(); ctx.moveTo(x0, ry); ctx.lineTo(x0 + cw, ry); ctx.stroke();
+      const off = (row % 2) ? bw / 2 : 0;
+      for (let bx = x0 + off; bx < x0 + cw; bx += bw) {
+        ctx.beginPath(); ctx.moveTo(bx, ry); ctx.lineTo(bx, ry + rh); ctx.stroke();
+      }
+      ctx.fillStyle = "rgba(255,255,255,0.03)";
+      ctx.fillRect(x0, ry + 1, cw, 1.5);
+    }
+
+    // a lit torch on the wall
+    const ty = wall.top + 150;
+    const flick = 0.7 + Math.sin(performance.now() / 120 + side) * 0.15 + Math.random() * 0.1;
+    const fg = ctx.createRadialGradient(cx, ty, 1, cx, ty, 22);
+    fg.addColorStop(0, `rgba(255,190,90,${0.45 * flick})`);
+    fg.addColorStop(1, "rgba(255,150,60,0)");
+    ctx.fillStyle = fg;
+    ctx.beginPath(); ctx.arc(cx, ty, 22, 0, 6.28); ctx.fill();
+    ctx.fillStyle = "#6A5240";
+    ctx.fillRect(cx - 1.5, ty, 3, 8);
+    ctx.fillStyle = "#FFD98A";
+    ctx.beginPath(); ctx.ellipse(cx, ty - 1, 3, 5 * flick, 0, 0, 6.28); ctx.fill();
+
+    // roofed turret crowning the top of each wall
+    drawTurretCap(x0, cw, wall.top + 6, side, true);
+    // crenellated turret at the base, flanking the gate
+    drawTurretCap(x0, cw, wall.bottom - 8, side, false);
+  }
+
+  drawGate();
+}
+
+/* a turret cap on a wall column: crenellations, plus a conical roof and
+   pennant on the top ones. Drawn at full column width so there are no gaps. */
+function drawTurretCap(x0, cw, capY, side, isTop) {
+  const cx = x0 + cw / 2;
+  const x1 = x0 + cw;
+
+  // slightly brighter band so the turret reads as a distinct block on the wall
+  const g = ctx.createLinearGradient(x0, 0, x1, 0);
+  g.addColorStop(0, "#3A3252"); g.addColorStop(0.5, "#544A6E"); g.addColorStop(1, "#2A2438");
+  ctx.fillStyle = g;
+  ctx.fillRect(x0, capY - 2, cw, 40);
+
+  // corbel course
+  ctx.fillStyle = "#5A5072";
+  ctx.fillRect(x0 - 2, capY - 6, cw + 4, 6);
+
+  // merlons with dark crenel gaps
+  const merlons = 4, step = (cw + 4) / merlons;
+  for (let m = 0; m < merlons; m++) {
+    ctx.fillStyle = m % 2 ? "#463D5E" : "#564B70";
+    ctx.fillRect(x0 - 2 + m * step + 1.5, capY - 16, step - 3, 12);
+  }
+
+  // arrow-slit
+  ctx.fillStyle = "#140E20";
+  ctx.fillRect(cx - 1.5, capY + 6, 3, 14);
+
+  if (isTop) {
+    const eaves = capY - 16;
+    const apexY = eaves - cw * 0.55;
+    const rg = ctx.createLinearGradient(x0, 0, x1, 0);
+    rg.addColorStop(0, "#3A2A50"); rg.addColorStop(0.5, "#7A5A9E"); rg.addColorStop(1, "#3A2A50");
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.moveTo(x0 - 4, eaves);
+    ctx.lineTo(cx, apexY);
+    ctx.lineTo(x1 + 4, eaves);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = "rgba(0,0,0,0.3)"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x0 - 4, eaves); ctx.lineTo(x1 + 4, eaves); ctx.stroke();
+
+    // finial + pennant
+    ctx.fillStyle = "#E8B24C";
+    ctx.beginPath(); ctx.arc(cx, apexY, 2.5, 0, 6.28); ctx.fill();
+    const wave = Math.sin(performance.now() / 240 + side) * 3;
+    ctx.strokeStyle = "#6A6280"; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(cx, apexY); ctx.lineTo(cx, apexY - 14); ctx.stroke();
+    ctx.fillStyle = side === 0 ? "#4CA9E8" : "#E8556B";
+    ctx.beginPath();
+    ctx.moveTo(cx, apexY - 14);
+    ctx.lineTo(cx + 15, apexY - 11 + wave);
+    ctx.lineTo(cx, apexY - 7);
+    ctx.closePath(); ctx.fill();
+  }
+}
+
+/* the gate: a stone gatehouse with iron-banded timber doors, between the walls */
+function drawGate() {
+  const gx0 = wall.left, gx1 = wall.right, gw = gx1 - gx0;
+  const gy = wall.bottom;
+  const gh = Math.min(58, H - wall.bottom - 4);
+  const hpFrac = Math.max(0, G.castleHP / LEVEL.castleHP);
+
+  // ground apron
+  ctx.fillStyle = "#20182E";
+  ctx.fillRect(0, gy + gh, W, H - gy - gh);
+
+  // gatehouse stone surround
+  ctx.fillStyle = "#3A3252";
+  ctx.fillRect(gx0 - 8, gy - 12, gw + 16, gh + 14);
+  // lintel with battlement nubs
+  ctx.fillStyle = "#4A4162";
+  ctx.fillRect(gx0 - 12, gy - 18, gw + 24, 9);
+  for (let m = 0; m < 5; m++) {
+    ctx.fillRect(gx0 - 12 + m * (gw + 24) / 5 + 2, gy - 26, (gw + 24) / 5 - 4, 9);
+  }
+
+  // recessed archway
+  ctx.fillStyle = "#160F22";
+  const ax0 = gx0 + 4, ax1 = gx1 - 4, aw = ax1 - ax0;
+  ctx.beginPath();
+  ctx.moveTo(ax0, gy + gh);
+  ctx.lineTo(ax0, gy + 6);
+  ctx.quadraticCurveTo((ax0 + ax1) / 2, gy - 14, ax1, gy + 6);
+  ctx.lineTo(ax1, gy + gh);
+  ctx.closePath();
+  ctx.fill();
+
+  // twin timber doors, tinted toward red as they fail
+  const woodR = 90 + (1 - hpFrac) * 60;
+  const wood = `rgb(${woodR|0}, ${58*hpFrac + 20|0}, ${30*hpFrac + 10|0})`;
+  const woodD = `rgb(${(woodR*0.7)|0}, ${(58*hpFrac+20)*0.7|0}, ${(30*hpFrac+10)*0.7|0})`;
+  const mid = (ax0 + ax1) / 2;
+  for (const [dx0, dx1] of [[ax0 + 3, mid - 1], [mid + 1, ax1 - 3]]) {
+    ctx.fillStyle = wood;
+    ctx.fillRect(dx0, gy + 4, dx1 - dx0, gh - 4);
+    // plank seams
+    ctx.strokeStyle = woodD; ctx.lineWidth = 1;
+    for (let px = dx0 + 5; px < dx1; px += 8) {
+      ctx.beginPath(); ctx.moveTo(px, gy + 6); ctx.lineTo(px, gy + gh - 2); ctx.stroke();
+    }
+    // iron bands
+    ctx.fillStyle = "#2A2438";
+    for (let by = gy + 10; by < gy + gh - 4; by += 16) {
+      ctx.fillRect(dx0, by, dx1 - dx0, 3);
+    }
+    // studs
+    ctx.fillStyle = "#5A5270";
+    for (let by = gy + 10; by < gy + gh - 4; by += 16) {
+      ctx.beginPath(); ctx.arc(dx0 + 3, by + 1.5, 1.4, 0, 6.28); ctx.fill();
+      ctx.beginPath(); ctx.arc(dx1 - 3, by + 1.5, 1.4, 0, 6.28); ctx.fill();
+    }
+  }
+  // ring handles
+  ctx.strokeStyle = "#6A6280"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(mid - 8, gy + gh * 0.55, 4, 0, 6.28); ctx.stroke();
+  ctx.beginPath(); ctx.arc(mid + 8, gy + gh * 0.55, 4, 0, 6.28); ctx.stroke();
+
+  // battle damage: splintering when the doors are failing
+  if (hpFrac < 0.5) {
+    ctx.strokeStyle = "rgba(0,0,0,0.55)"; ctx.lineWidth = 1.5;
+    const cracks = Math.round((1 - hpFrac) * 5);
+    for (let i = 0; i < cracks; i++) {
+      const cx = ax0 + ((i * 71 + 20) % aw);
+      ctx.beginPath();
+      ctx.moveTo(cx, gy + 6);
+      ctx.lineTo(cx + 5, gy + gh * 0.45);
+      ctx.lineTo(cx - 3, gy + gh * 0.8);
+      ctx.stroke();
+    }
+  }
+}
+
+function drawSlots() {
+  for (const s of slots) {
+    const sel = G.selectedSlot === s;
+    if (!s.turret) {
+      // empty socket — sized to the cannon carriage that will sit here
+      ctx.strokeStyle = sel ? "#E8B24C" : "#463D5E";
+      ctx.lineWidth = sel ? 2.5 : 1.5;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      if (ctx.roundRect) ctx.roundRect(s.x - 11, s.y - 8, 22, 20, 4);
+      else ctx.rect(s.x - 11, s.y - 8, 22, 20);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = sel ? "#E8B24C" : "#463D5E";
+      ctx.font = "700 13px 'Space Grotesk'";
+      ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("+", s.x, s.y + 2);
+    } else {
+      drawCannon(s, s.turret, sel);
+    }
+  }
+}
+
+/* a compact stone-mounted cannon; barrel rotates to track its target */
+function drawCannon(s, t, sel) {
+  const col = t.color === "multi" ? null : COLORS[t.color];
+  const recoil = t.flash > 0 ? Math.min(t.flash * 4, 1) * 3 : 0;
+  const aim = t.aim == null ? (s.side === 0 ? -0.35 : Math.PI + 0.35) : t.aim;
+
+  ctx.save();
+  ctx.translate(s.x, s.y);
+
+  // selection ring
+  if (sel) {
+    ctx.strokeStyle = "#E8B24C"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(0, 0, 19, 0, 6.28); ctx.stroke();
+  }
+
+  // stone carriage
+  ctx.fillStyle = "#1C1730";
+  ctx.beginPath();
+  if (ctx.roundRect) ctx.roundRect(-11, -3, 22, 15, 3); else ctx.rect(-11, -3, 22, 15);
+  ctx.fill();
+  // wheel
+  ctx.fillStyle = "#372F4A";
+  ctx.beginPath(); ctx.arc(0, 9, 6, 0, 6.28); ctx.fill();
+  ctx.fillStyle = "#463D5E";
+  ctx.beginPath(); ctx.arc(0, 9, 2.2, 0, 6.28); ctx.fill();
+
+  // barrel — rotated to the tracked aim angle
+  ctx.save();
+  ctx.rotate(aim);
+  ctx.translate(-recoil, 0);          // recoil kicks straight back along the barrel
+  const bl = 20, br1 = 6, br2 = 4.5;  // length, breech radius, muzzle radius
+  if (t.color === "multi") {
+    const grd = ctx.createLinearGradient(0, 0, bl, 0);
+    grd.addColorStop(0, COLORS.red);
+    grd.addColorStop(0.5, COLORS.blue);
+    grd.addColorStop(1, COLORS.green);
+    ctx.fillStyle = grd;
+  } else {
+    ctx.fillStyle = col;
+  }
+  ctx.beginPath();
+  ctx.moveTo(0, -br1);
+  ctx.lineTo(bl, -br2);
+  ctx.lineTo(bl, br2);
+  ctx.lineTo(0, br1);
+  ctx.closePath();
+  ctx.fill();
+  // underside shading
+  ctx.fillStyle = "rgba(0,0,0,0.25)";
+  ctx.beginPath();
+  ctx.moveTo(0, 0); ctx.lineTo(bl, 0);
+  ctx.lineTo(bl, br2); ctx.lineTo(0, br1);
+  ctx.closePath(); ctx.fill();
+  // muzzle ring
+  ctx.strokeStyle = "rgba(255,255,255,0.4)"; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(bl, -br2); ctx.lineTo(bl, br2); ctx.stroke();
+  // muzzle flash
+  if (t.flash > 0) {
+    ctx.globalAlpha = Math.min(t.flash * 5, 1);
+    ctx.fillStyle = "#FFF3C4";
+    ctx.beginPath(); ctx.arc(bl + 3, 0, 5, 0, 6.28); ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+  ctx.restore();
+
+  // breech cap — drawn after barrel so it sits on top of the pivot
+  ctx.fillStyle = "#100B1A";
+  ctx.beginPath(); ctx.arc(0, 0, br1, 0, 6.28); ctx.fill();
+  ctx.fillStyle = t.color === "multi" ? "#fff" : col;
+  ctx.beginPath(); ctx.arc(0, 0, br1 - 2.5, 0, 6.28); ctx.fill();
+
+  // level pip
+  ctx.fillStyle = "#ECE6F5";
+  ctx.font = "700 8px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.fillText(t.level, 0, 0);
+
+  // path badge below the carriage
+  if (t.path) {
+    ctx.fillStyle = "#E8B24C";
+    ctx.font = "700 7px 'JetBrains Mono', monospace";
+    const badge = t.path === "sniper" ? "SNP" : t.path === "rapid" ? "RPD" : "VLY";
+    ctx.fillText(badge, 0, 20);
+  }
+
+  ctx.restore();
+}
+
+function drawBubble(b) {
+  const col = COLORS[b.color];
+  // outer glow
+  ctx.globalAlpha = 0.28;
+  ctx.fillStyle = col;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r + 7, 0, 6.28); ctx.fill();
+  ctx.globalAlpha = 1;
+
+  // translucent film body — bright rim, hollow-ish centre
+  const body = ctx.createRadialGradient(b.x, b.y, b.r * 0.2, b.x, b.y, b.r);
+  body.addColorStop(0,    "rgba(255,255,255,0.10)");
+  body.addColorStop(0.55, hexA(col, 0.35));
+  body.addColorStop(0.85, hexA(col, 0.85));
+  body.addColorStop(1,    hexA(col, 0.55));
+  ctx.fillStyle = body;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.28); ctx.fill();
+
+  // crisp outer rim
+  ctx.strokeStyle = hexA(col, 0.9); ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 6.28); ctx.stroke();
+
+  // inner iridescent ring, the soap-film look
+  ctx.strokeStyle = "rgba(255,255,255,0.25)"; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(b.x, b.y, b.r * 0.72, 0, 6.28); ctx.stroke();
+
+  // big soft specular highlight, upper-left
+  const hx = b.x - b.r * 0.34, hy = b.y - b.r * 0.36;
+  const hl = ctx.createRadialGradient(hx, hy, 0, hx, hy, b.r * 0.5);
+  hl.addColorStop(0, "rgba(255,255,255,0.95)");
+  hl.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = hl;
+  ctx.beginPath(); ctx.arc(hx, hy, b.r * 0.5, 0, 6.28); ctx.fill();
+
+  // tiny sharp glint
+  ctx.fillStyle = "rgba(255,255,255,0.9)";
+  ctx.beginPath(); ctx.arc(b.x - b.r * 0.42, b.y - b.r * 0.44, b.r * 0.1, 0, 6.28); ctx.fill();
+}
+
+/* hex + alpha -> rgba() string */
+function hexA(hex, a) {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+/* ============================================================
+   HUD / FLOW
+   ============================================================ */
+function updateHUD() {
+  document.getElementById("hScore").textContent = G.score;
+  document.getElementById("hCoins").textContent = G.coins;
+  document.getElementById("hWave").textContent = wavesRemainingText();
+  document.getElementById("castleFill").style.width = (100 * G.castleHP / LEVEL.castleHP) + "%";
+}
+
+function starsFor(score) {
+  let s = 0;
+  for (const cut of LEVEL.starCuts) if (score >= cut) s++;
+  return s;
+}
+
+function endLevel(held) {
+  if (G.over) return;
+  G.over = true;
+  G.running = false;
+
+  const stars = held ? Math.max(starsFor(G.score), 1) : starsFor(G.score);
+  bestStars[LEVEL.id] = Math.max(bestStars[LEVEL.id] || 0, stars);
+  const earned = Math.round(G.score / 20) + stars * 25 + (held ? 40 : 0);
+  G.coins += earned;
+
+  document.getElementById("endTag").textContent = "Level " + LEVEL.id;
+  document.getElementById("endTitle").textContent = held ? "Ramparts Held." : "Walls Breached.";
+  document.getElementById("endStars").textContent =
+    "★★★☆☆☆".slice(3 - stars, 6 - stars);
+  document.getElementById("endScore").textContent = G.score;
+  document.getElementById("endCoins").textContent = earned;
+  document.getElementById("endNext").textContent = held ? "Next level" : "Try again";
+  show("endOverlay");
+}
+
+function startLevel() {
+  G.running = true; G.over = false;
+  G.score = 0; G.coins = LEVEL.startCoins; G.castleHP = LEVEL.castleHP;
+  G.waveIdx = -1; G.waveActive = false; G.betweenTimer = 2.0;
+  bubbles = []; bolts = []; pops = []; coinsFx = [];
+  G.selectedSlot = null;
+  updateHUD();
+}
+
+/* ---- menu flow: main menu -> level select -> intro -> play ---- */
+const CAMPAIGN = [
+  { id: 1, name: "The First Siege", locked: false },
+  { id: 2, name: "The Long Night",  locked: true },
+  { id: 3, name: "The Iron Tide",   locked: true },
+];
+const bestStars = {};   // id -> stars, kept for the session
+
+function show(id) {
+  ["menuOverlay","levelOverlay","startOverlay","endOverlay"].forEach(o =>
+    document.getElementById(o).classList.toggle("show", o === id));
+}
+
+function buildLevelSelect() {
+  const grid = document.getElementById("levelGrid");
+  grid.innerHTML = "";
+  for (const lv of CAMPAIGN) {
+    const card = document.createElement("div");
+    card.className = "levelCard" + (lv.locked ? " locked" : "");
+    const stars = bestStars[lv.id] || 0;
+    const starStr = lv.locked ? "Locked" : ("★★★☆☆☆".slice(3 - stars, 6 - stars) + (stars ? "" : " — not cleared"));
+    card.innerHTML = `
+      <div class="num">${lv.id}</div>
+      <div class="meta"><div class="nm">${lv.name}</div><div class="st">${starStr}</div></div>
+      <button class="go2">${lv.locked ? "🔒" : "Play"}</button>`;
+    if (!lv.locked) card.querySelector(".go2").onclick = () => openIntro(lv.id);
+    grid.appendChild(card);
+  }
+}
+
+function openIntro(id) {
+  document.getElementById("introTag").textContent = "Level " + id;
+  const lv = CAMPAIGN.find(l => l.id === id);
+  document.getElementById("introTitle").textContent = lv ? lv.name : "The First Siege";
+  show("startOverlay");
+}
+
+document.getElementById("playBtn").onclick = () => { buildLevelSelect(); show("levelOverlay"); };
+document.getElementById("levelBack").onclick = () => show("menuOverlay");
+document.getElementById("introBack").onclick = () => { buildLevelSelect(); show("levelOverlay"); };
+
+document.getElementById("startBtn").onclick = () => {
+  show(null);
+  startLevel();
+  setTimeout(() => {
+    const h = document.getElementById("hint");
+    if (h) h.style.opacity = "0";
+  }, 5000);
+};
+
+document.getElementById("endNext").onclick = () => {
+  const held = document.getElementById("endTitle").textContent.includes("Held");
+  if (!held) slots.forEach(s => s.turret = null);
+  buildLevelSelect();
+  show("levelOverlay");
+};
+document.getElementById("endRetry").onclick = () => {
+  slots.forEach(s => s.turret = null);
+  show(null);
+  startLevel();
+};
+
+/* ============================================================
+   MAIN LOOP
+   ============================================================ */
+function loop(now) {
+  const dt = Math.min((now - G.lastT) / 1000, 0.05) || 0;
+  G.lastT = now;
+  if (G.running && !G.over) update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener("resize", resize);
+resize();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
